@@ -1,6 +1,7 @@
 import React, { useEffect, useMemo, useRef, useState } from "react";
 
 // --- Optional: PapaParse for robust CSV parsing ---
+// Canvas runtime makes NPM packages available; if it fails, we fall back to a tiny parser.
 let PapaRef: any = null;
 (async () => {
   try {
@@ -49,31 +50,121 @@ function csvEscape(value: any): string {
 }
 
 function toISODate(dateStr: string): string {
+  // Accepts: "YYYY-MM-DD HH:MM:SS" or "YYYY-MM-DD"
   if (!dateStr) return "";
   const d = dateStr.trim().slice(0, 10);
+  // naive validation
   if (/^\d{4}-\d{2}-\d{2}$/.test(d)) return d;
   const dt = new Date(dateStr);
-  if (!isNaN((dt as unknown) as number)) return dt.toISOString().slice(0, 10);
+  if (!isNaN(dt as unknown as number)) return dt.toISOString().slice(0, 10);
   return "";
 }
 
 function heuristicCategory(name: string): string {
   const s = (name || "").toLowerCase();
-  const has = (k: string | RegExp) => (typeof k === "string" ? s.includes(k) : !!s.match(k));
-  if (has("salary") || has("stipend") || has("payroll") || has("bonifico in entrata")) return "Income";
-  if (has("atm") || has("cash withdrawal") || has("prelievo")) return "Cash Withdrawal";
-  if (has("transfer") || has("bonifico") || has("internal transfer") || has("worldpay")) return "Transfers";
-  if (has("amazon") || has("zalando") || has("decathlon") || has("ikea")) return "Shopping";
-  if (has("conad") || has("coop") || has("lidl") || has("eurospin") || has("supermerc")) return "Groceries";
-  if (has("bar ") || has("caffe") || has("ristor") || has("trattoria") || has("locanda") || has("osteria") || has("pizza") || has("mcd") || has("burger") || has("kebab"))
+  const has = (k: string | RegExp) =>
+    typeof k === "string" ? s.includes(k) : !!s.match(k);
+  if (
+    has("salary") ||
+    has("stipend") ||
+    has("payroll") ||
+    has("bonifico in entrata")
+  )
+    return "Income";
+  if (has("atm") || has("cash withdrawal") || has("prelievo"))
+    return "OtherExpenses";
+  if (
+    has("transfer") ||
+    has("bonifico") ||
+    has("internal transfer") ||
+    has("worldpay")
+  )
+    return "Transfers";
+  if (has("amazon") || has("zalando") || has("decathlon") || has("ikea"))
+    return "Shopping";
+  if (
+    has("conad") ||
+    has("coop") ||
+    has("lidl") ||
+    has("eurospin") ||
+    has("supermerc")
+  )
+    return "Groceries";
+  if (
+    has("eni") ||
+    has("esso") ||
+    has("shell") ||
+    has("q8") ||
+    has("total") ||
+    has("tamoil") ||
+    has(" api ") ||
+    has(" ip ")
+  )
+    return "Fuel";
+  if (
+    has("eni") ||
+    has("esso") ||
+    has("shell") ||
+    has("q8") ||
+    has("total") ||
+    has("tamoil") ||
+    has(" api ") ||
+    has(" ip ")
+  )
+    return "Fuel";
+  if (
+    has("bar ") ||
+    has("caffe") ||
+    has("ristor") ||
+    has("trattoria") ||
+    has("locanda") ||
+    has("osteria") ||
+    has("pizza") ||
+    has("mcd") ||
+    has("burger") ||
+    has("kebab")
+  )
     return "Out";
-  if (has("trenitalia") || has("italo") || has("uber") || has("taxi") || has("flixbus") || has("ryanair") || has("wizz"))
+  if (
+    has("trenitalia") ||
+    has("italo") ||
+    has("uber") ||
+    has("taxi") ||
+    has("flixbus") ||
+    has("ryanair") ||
+    has("wizz")
+  )
     return "Transport";
-  if (has("spotify") || has("netflix") || has("steam") || has("prime") || has("disney")) return "Entertainment";
-  if (has("enel") || has("acea") || has("tim") || has("vodafone") || has("windtre") || has("bolletta")) return "Bills";
-  if (has("affitto") || has("rent") || has("mutuo") || has("mortgage")) return "Housing";
-  if (has("farmacia") || has("pharma") || has("clinic") || has("ospedale") || has("dental")) return "Health";
-  if (has("hotel") || has("booking") || has("airbnb") || has("hostel")) return "Travel";
+  if (
+    has("spotify") ||
+    has("netflix") ||
+    has("steam") ||
+    has("prime") ||
+    has("disney") ||
+    has("openai")
+  )
+    return "Subscriptions";
+  if (
+    has("enel") ||
+    has("acea") ||
+    has("tim") ||
+    has("vodafone") ||
+    has("windtre") ||
+    has("bolletta")
+  )
+    return "Bills";
+  if (has("affitto") || has("rent") || has("mutuo") || has("mortgage"))
+    return "Housing";
+  if (
+    has("farmacia") ||
+    has("pharma") ||
+    has("clinic") ||
+    has("ospedale") ||
+    has("dental")
+  )
+    return "Health";
+  if (has("hotel") || has("booking") || has("airbnb") || has("hostel"))
+    return "Travel";
   if (has("fee") || has("commission")) return "Fees";
   return "OtherExpenses";
 }
@@ -83,10 +174,11 @@ async function classifyWithOpenAI(
   apiKey: string,
   model: string = "gpt-4o-mini"
 ): Promise<Record<string, string>> {
-  if (!apiKey) throw new Error("Please add your LLM API key in Settings.");
+  if (!apiKey) throw new Error("Missing API key");
   const chunks: string[][] = [];
-  const CHUNK = 40;
-  for (let i = 0; i < names.length; i += CHUNK) chunks.push(names.slice(i, i + CHUNK));
+  const CHUNK = 40; // keep prompts compact
+  for (let i = 0; i < names.length; i += CHUNK)
+    chunks.push(names.slice(i, i + CHUNK));
 
   const mapping: Record<string, string> = {};
 
@@ -126,11 +218,13 @@ async function classifyWithOpenAI(
     try {
       const obj = JSON.parse(text);
       Object.assign(mapping, obj);
-    } catch {
+    } catch (e) {
+      // Model output not strict JSON — attempt to salvage {...}
       const m = text.match(/\{[\s\S]*\}/);
       if (m) {
         Object.assign(mapping, JSON.parse(m[0]));
       } else {
+        // fallback: heuristics for this batch
         for (const n of group) mapping[n] = heuristicCategory(n);
       }
     }
@@ -139,6 +233,7 @@ async function classifyWithOpenAI(
 }
 
 function fallbackParse(csvText: string): { data: any[]; errors: string[] } {
+  // Simple CSV parser for well-formed, comma-separated files without fancy quoting.
   const lines = csvText.split(/\r?\n/).filter(Boolean);
   if (!lines.length) return { data: [], errors: ["Empty file"] };
   const headers = lines[0].split(",").map((s) => s.trim());
@@ -151,16 +246,53 @@ function fallbackParse(csvText: string): { data: any[]; errors: string[] } {
   return { data: rows, errors: [] };
 }
 
-// --- Tiny dev self-tests (console) ---
+// --- Tiny dev self-tests to catch regressions (runs once in browser console) ---
 function runSelfTests() {
   try {
     console.group("RCVT self-tests");
-    console.assert(toISODate("2025-08-01 23:59:00") === "2025-08-01", "toISODate failed A");
+    console.assert(
+      toISODate("2025-08-01 23:59:00") === "2025-08-01",
+      "toISODate failed A"
+    );
     console.assert(csvEscape("a,b") === '"a,b"', "csvEscape comma");
-    console.assert(csvEscape('He said "Hi"') === '"He said ""Hi"""', "csvEscape quotes");
-    console.assert(heuristicCategory("Conad Superstore") === "Groceries", "heuristics groceries");
-    console.assert(heuristicCategory("Salary ACME") === "Income", "heuristics income");
-    console.assert(["Expense", "Income"].includes((() => { const amt=-12; return amt<0?"Expense":"Income"; })()), "type calc");
+    console.assert(
+      csvEscape('He said "Hi"') === '"He said ""Hi"""',
+      "csvEscape quotes"
+    );
+    console.assert(
+      heuristicCategory("Conad Superstore") === "Groceries",
+      "heuristics groceries"
+    );
+    console.assert(
+      heuristicCategory("Salary ACME") === "Income",
+      "heuristics income"
+    );
+    console.assert(
+      ["Expense", "Income"].includes(
+        (() => {
+          const amt = -12;
+          return amt < 0 ? "Expense" : "Income";
+        })()
+      ),
+      "type calc"
+    );
+    console.assert(
+      parseAmount("-47.30") === -47.3,
+      "parseAmount dot decimal negative"
+    );
+    console.assert(parseAmount("1.234,56") === 1234.56, "parseAmount EU style");
+    console.assert(
+      parseAmount("-1.234,56") === -1234.56,
+      "parseAmount EU negative"
+    );
+    console.assert(
+      parseAmount("4,730.00") === 4730.0,
+      "parseAmount US thousands"
+    );
+    console.assert(
+      parseAmount("-4.730,00") === -4730.0,
+      "parseAmount EU thousands"
+    );
     console.groupEnd();
   } catch (e) {
     console.warn("Self-tests encountered an issue:", e);
@@ -171,6 +303,33 @@ if (typeof window !== "undefined" && !(window as any).__rcvt_tests_ran) {
   runSelfTests();
 }
 
+function parseAmount(input: string): number {
+  let s = (input ?? "").toString().trim();
+  if (!s) return 0;
+  s = s.replace(/[^0-9.,\-+]/g, "");
+  if (!s) return 0;
+  let sign = 1;
+  if (s.includes("-")) sign = -1;
+  s = s.replace(/-/g, "");
+  const hasComma = s.includes(",");
+  const hasDot = s.includes(".");
+  if (hasComma && hasDot) {
+    const lastComma = s.lastIndexOf(",");
+    const lastDot = s.lastIndexOf(".");
+    if (lastComma > lastDot) {
+      s = s.replace(/\./g, "").replace(/,/g, ".");
+    } else {
+      s = s.replace(/,/g, "");
+    }
+  } else if (hasComma && !hasDot) {
+    s = s.replace(/,/g, ".");
+  } else {
+    // only dot or no separator -> already fine
+  }
+  const num = parseFloat(s);
+  return isNaN(num) ? 0 : sign * num;
+}
+
 export default function App() {
   const [tab, setTab] = useState<"transform" | "settings">("transform");
 
@@ -178,10 +337,28 @@ export default function App() {
   const [apiKey, setApiKey] = useState<string>("");
   const [source, setSource] = useState<string>("Revolut");
   const [websiteName, setWebsiteName] = useState<string>(siteNameDefault);
-  const [dateField, setDateField] = useState<"Completed Date" | "Started Date">("Completed Date");
+  const [dateField, setDateField] = useState<"Completed Date" | "Started Date">(
+    "Completed Date"
+  );
   const [onlyCompleted, setOnlyCompleted] = useState<boolean>(true);
   const [model, setModel] = useState<string>("gpt-4o-mini");
-  const [typeFilter, setTypeFilter] = useState<"Both" | "Expense" | "Income">("Both");
+  const [typeFilter, setTypeFilter] = useState<"Both" | "Expense" | "Income">(
+    "Both"
+  );
+
+  // Add types + state
+  type EditableField = "Date" | "Category" | "Notes";
+
+  const [editing, setEditing] = useState<{
+    id: string;
+    field: EditableField;
+  } | null>(null);
+  const [draftEdits, setDraftEdits] = useState<
+    Record<string, Partial<Record<EditableField, string>>>
+  >({});
+  const [edits, setEdits] = useState<
+    Record<string, Partial<Record<EditableField, string>>>
+  >({});
 
   useEffect(() => {
     const s = localStorage.getItem("rcvt_settings");
@@ -192,7 +369,9 @@ export default function App() {
         setSource(obj.source ?? "Revolut");
         setWebsiteName(obj.websiteName ?? siteNameDefault);
         setDateField(obj.dateField ?? "Completed Date");
-        setOnlyCompleted(typeof obj.onlyCompleted === "boolean" ? obj.onlyCompleted : true);
+        setOnlyCompleted(
+          typeof obj.onlyCompleted === "boolean" ? obj.onlyCompleted : true
+        );
         setModel(obj.model ?? "gpt-4o-mini");
         setTypeFilter(obj.typeFilter ?? "Both");
       } catch {}
@@ -200,9 +379,25 @@ export default function App() {
   }, []);
 
   useEffect(() => {
-    const payload = { apiKey, source, websiteName, dateField, onlyCompleted, model, typeFilter };
+    const payload = {
+      apiKey,
+      source,
+      websiteName,
+      dateField,
+      onlyCompleted,
+      model,
+      typeFilter,
+    };
     localStorage.setItem("rcvt_settings", JSON.stringify(payload));
-  }, [apiKey, source, websiteName, dateField, onlyCompleted, model, typeFilter]);
+  }, [
+    apiKey,
+    source,
+    websiteName,
+    dateField,
+    onlyCompleted,
+    model,
+    typeFilter,
+  ]);
 
   // Upload & processing state
   const [rawRows, setRawRows] = useState<any[]>([]);
@@ -228,13 +423,18 @@ export default function App() {
     setStatus("Parsing CSV...");
     setErrors([]);
     setCategoryMap({});
+    setEdits({});
+    setDraftEdits({});
 
     const text = await file.text();
     let data: any[] = [];
     let parseErrors: any[] = [];
 
     if (PapaRef) {
-      const parsed = PapaRef.parse(text, { header: true, skipEmptyLines: true });
+      const parsed = PapaRef.parse(text, {
+        header: true,
+        skipEmptyLines: true,
+      });
       data = parsed.data as any[];
       parseErrors = parsed.errors || [];
     } else {
@@ -246,17 +446,23 @@ export default function App() {
     if (parseErrors.length) {
       setErrors((e) => [
         ...e,
-        `Parsing issues: ${parseErrors.slice(0, 3).map((x: any) => x.message || x).join(" | ")}`,
+        `Parsing issues: ${parseErrors
+          .slice(0, 3)
+          .map((x: any) => x.message || x)
+          .join(" | ")}`,
       ]);
     }
 
+    // Basic header validation
     const headerLine = text.split(/\r?\n/)[0] || "";
     const headers = headerLine.split(",").map((s) => s.trim());
     const missing = expectedHeaders.filter((h) => !headers.includes(h));
     if (missing.length) {
       setErrors((e) => [
         ...e,
-        `Missing expected columns: ${missing.join(", ")}. Got: ${headers.join(", ")}`,
+        `Missing expected columns: ${missing.join(", ")}. Got: ${headers.join(
+          ", "
+        )}`,
       ]);
     }
 
@@ -265,8 +471,12 @@ export default function App() {
   }
 
   const filteredRows = useMemo(() => {
-    const rows = (rawRows || []).filter((r) => !!r && Object.keys(r).length > 0);
-    return onlyCompleted ? rows.filter((r) => (r["State"] || "").toUpperCase() === "COMPLETED") : rows;
+    const rows = (rawRows || []).filter(
+      (r) => !!r && Object.keys(r).length > 0
+    );
+    return onlyCompleted
+      ? rows.filter((r) => (r["State"] || "").toUpperCase() === "COMPLETED")
+      : rows;
   }, [rawRows, onlyCompleted]);
 
   const uniqueNames = useMemo(() => {
@@ -279,16 +489,18 @@ export default function App() {
   }, [filteredRows]);
 
   const transformedAll = useMemo(() => {
-    return filteredRows.map((r) => {
-      const rawAmt = (r["Amount"] ?? "0").toString().replace(/\s/g, "");
-      const normalized = rawAmt.replace(/\./g, "").replace(/,/g, "."); // 1.234,56 → 1234.56
-      const amtNum = parseFloat(normalized);
+    return filteredRows.map((r, i) => {
+      // Parse numeric amount: accept both comma and dot decimals; keep sign for type inference
+      const amtNum = parseAmount((r["Amount"] ?? "0").toString());
       const type = amtNum < 0 ? "Expense" : "Income";
       const amountAbs = Math.abs(amtNum || 0).toFixed(2);
       const name = (r["Description"] || "").toString();
       const category = categoryMap[name] || heuristicCategory(name);
-      const dateVal = toISODate(r[dateField] || r["Completed Date"] || r["Started Date"] || "");
+      const dateVal = toISODate(
+        r[dateField] || r["Completed Date"] || r["Started Date"] || ""
+      );
       return {
+        _id: String(i),
         Date: dateVal,
         Type: type,
         Amount: amountAbs,
@@ -307,6 +519,13 @@ export default function App() {
     return transformedAll.filter((r) => r.Type === typeFilter);
   }, [transformedAll, typeFilter]);
 
+  const visibleRows = useMemo(() => {
+    return transformedFiltered.map((row: any) => {
+      const e = edits[row._id] || {};
+      return { ...row, ...e };
+    });
+  }, [transformedFiltered, edits]);
+
   async function handleClassify() {
     try {
       if (!apiKey) throw new Error("Please add your LLM API key in Settings.");
@@ -321,17 +540,29 @@ export default function App() {
   }
 
   function handleDownload() {
-    const cols = ["Date","Type","Amount","Currency","Category","Name","Account","Notes","Source"];
-    const header = cols.join(",");
-    const body = transformedFiltered
+    const cols = [
+      "Date",
+      "Type",
+      "Amount",
+      "Currency",
+      "Category",
+      "Name",
+      "Account",
+      "Notes",
+      "Source",
+    ];
+    const body = visibleRows
       .map((row) => cols.map((c) => csvEscape((row as any)[c])).join(","))
       .join("\n");
-    const csv = header + "\n" + body + "\n";
+
+    const csv = body ? body + "\n" : "";
     const blob = new Blob([csv], { type: "text/csv;charset=utf-8;" });
     const url = URL.createObjectURL(blob);
     const a = document.createElement("a");
     a.href = url;
-    a.download = `revolut_transformed_${new Date().toISOString().slice(0, 10)}.csv`;
+    a.download = `revolut_transformed_${new Date()
+      .toISOString()
+      .slice(0, 10)}.csv`;
     document.body.appendChild(a);
     a.click();
     a.remove();
@@ -343,22 +574,34 @@ export default function App() {
       <header className="sticky top-0 z-20 bg-white/90 backdrop-blur border-b">
         <div className="max-w-6xl mx-auto px-4 py-3 flex items-center justify-between">
           <div className="flex items-center gap-3">
-            <div className="h-9 w-9 rounded-2xl bg-indigo-600 text-white flex items-center justify-center font-bold">R</div>
+            <div className="h-9 w-9 rounded-2xl bg-indigo-600 text-white flex items-center justify-center font-bold">
+              R
+            </div>
             <div>
-              <h1 className="text-lg font-semibold">{websiteName || siteNameDefault}</h1>
-              <p className="text-xs text-gray-500">Upload your Revolut CSV → classify → download a clean CSV</p>
+              <h1 className="text-lg font-semibold">
+                {websiteName || siteNameDefault}
+              </h1>
+              <p className="text-xs text-gray-500">
+                Upload your Revolut CSV → classify → download a clean CSV
+              </p>
             </div>
           </div>
           <nav className="flex gap-1 p-1 bg-gray-100 rounded-xl">
             <button
               onClick={() => setTab("transform")}
-              className={classNames("px-3 py-1.5 rounded-lg text-sm", tab === "transform" ? "bg-white shadow" : "text-gray-600")}
+              className={classNames(
+                "px-3 py-1.5 rounded-lg text-sm",
+                tab === "transform" ? "bg-white shadow" : "text-gray-600"
+              )}
             >
               Transform
             </button>
             <button
               onClick={() => setTab("settings")}
-              className={classNames("px-3 py-1.5 rounded-lg text-sm", tab === "settings" ? "bg-white shadow" : "text-gray-600")}
+              className={classNames(
+                "px-3 py-1.5 rounded-lg text-sm",
+                tab === "settings" ? "bg-white shadow" : "text-gray-600"
+              )}
             >
               Settings
             </button>
@@ -374,24 +617,44 @@ export default function App() {
               <div className="grid md:grid-cols-2 gap-4">
                 <label className="grid gap-1 text-sm">
                   <span className="text-gray-600">Website name</span>
-                  <input className="border rounded-lg px-3 py-2" value={websiteName} onChange={(e) => setWebsiteName(e.target.value)} placeholder={siteNameDefault}/>
+                  <input
+                    className="border rounded-lg px-3 py-2"
+                    value={websiteName}
+                    onChange={(e) => setWebsiteName(e.target.value)}
+                    placeholder={siteNameDefault}
+                  />
                 </label>
                 <label className="grid gap-1 text-sm">
                   <span className="text-gray-600">Source</span>
-                  <select className="border rounded-lg px-3 py-2" value={source} onChange={(e) => setSource(e.target.value)}>
+                  <select
+                    className="border rounded-lg px-3 py-2"
+                    value={source}
+                    onChange={(e) => setSource(e.target.value)}
+                  >
                     <option>Revolut</option>
                   </select>
                 </label>
                 <label className="grid gap-1 text-sm">
                   <span className="text-gray-600">Date field</span>
-                  <select className="border rounded-lg px-3 py-2" value={dateField} onChange={(e) => setDateField(e.target.value as any)}>
+                  <select
+                    className="border rounded-lg px-3 py-2"
+                    value={dateField}
+                    onChange={(e) => setDateField(e.target.value as any)}
+                  >
                     <option>Completed Date</option>
                     <option>Started Date</option>
                   </select>
                 </label>
                 <label className="flex items-center gap-3 text-sm pt-6">
-                  <input type="checkbox" checked={onlyCompleted} onChange={(e) => setOnlyCompleted(e.target.checked)} />
-                  Include only rows with <code className="px-1 rounded bg-gray-100">State = COMPLETED</code>
+                  <input
+                    type="checkbox"
+                    checked={onlyCompleted}
+                    onChange={(e) => setOnlyCompleted(e.target.checked)}
+                  />
+                  Include only rows with{" "}
+                  <code className="px-1 rounded bg-gray-100">
+                    State = COMPLETED
+                  </code>
                 </label>
               </div>
             </div>
@@ -401,12 +664,25 @@ export default function App() {
               <div className="grid md:grid-cols-2 gap-4">
                 <label className="grid gap-1 text-sm">
                   <span className="text-gray-600">OpenAI API key</span>
-                  <input type="password" className="border rounded-lg px-3 py-2" value={apiKey} onChange={(e) => setApiKey(e.target.value)} placeholder="sk-..." />
-                  <span className="text-xs text-gray-500">Stored locally in your browser. For prototypes only—avoid exposing secrets client-side.</span>
+                  <input
+                    type="password"
+                    className="border rounded-lg px-3 py-2"
+                    value={apiKey}
+                    onChange={(e) => setApiKey(e.target.value)}
+                    placeholder="sk-..."
+                  />
+                  <span className="text-xs text-gray-500">
+                    Stored locally in your browser. For prototypes only—avoid
+                    exposing secrets in client apps.
+                  </span>
                 </label>
                 <label className="grid gap-1 text-sm">
                   <span className="text-gray-600">Model</span>
-                  <select className="border rounded-lg px-3 py-2" value={model} onChange={(e) => setModel(e.target.value)}>
+                  <select
+                    className="border rounded-lg px-3 py-2"
+                    value={model}
+                    onChange={(e) => setModel(e.target.value)}
+                  >
                     <option value="gpt-4o-mini">gpt-4o-mini</option>
                     <option value="gpt-4o">gpt-4o</option>
                     <option value="gpt-4.1-mini">gpt-4.1-mini</option>
@@ -420,11 +696,14 @@ export default function App() {
             <div className="bg-white rounded-2xl shadow p-5 flex flex-col gap-3">
               <div className="flex flex-col md:flex-row md:items-center gap-3 justify-between">
                 <div>
-                  <h2 className="text-base font-semibold">Upload Revolut CSV</h2>
+                  <h2 className="text-base font-semibold">
+                    Upload Revolut CSV
+                  </h2>
                   <p className="text-sm text-gray-600">
                     Expected headers:{" "}
                     <code className="bg-gray-100 rounded px-1">
-                      Type, Product, Started Date, Completed Date, Description, Amount, Fee, Currency, State, Balance
+                      Type, Product, Started Date, Completed Date, Description,
+                      Amount, Fee, Currency, State, Balance
                     </code>
                   </p>
                 </div>
@@ -434,7 +713,9 @@ export default function App() {
                     type="file"
                     accept=".csv,text/csv"
                     className="border rounded-lg px-3 py-2"
-                    onChange={(e) => e.target.files && onFileSelected(e.target.files[0])}
+                    onChange={(e) =>
+                      e.target.files && onFileSelected(e.target.files[0])
+                    }
                   />
                   <button
                     onClick={() => {
@@ -450,7 +731,11 @@ export default function App() {
                 </div>
               </div>
 
-              {status && <div className="text-sm text-indigo-700 bg-indigo-50 border border-indigo-200 rounded-lg p-3">{status}</div>}
+              {status && (
+                <div className="text-sm text-indigo-700 bg-indigo-50 border border-indigo-200 rounded-lg p-3">
+                  {status}
+                </div>
+              )}
               {errors.length > 0 && (
                 <div className="text-sm text-red-700 bg-red-50 border border-red-200 rounded-lg p-3">
                   {errors.map((e, i) => (
@@ -475,16 +760,44 @@ export default function App() {
                       </select>
                     </label>
                     <div className="text-sm text-gray-600">
-                      Rows loaded: <b>{rawRows.length}</b> • After filter: <b>{filteredRows.length}</b> • Export rows: <b>{transformedFiltered.length}</b> • Unique names: <b>{uniqueNames.length}</b>
+                      Rows loaded: <b>{rawRows.length}</b> • After filter:{" "}
+                      <b>{filteredRows.length}</b> • Export rows:{" "}
+                      <b>{visibleRows.length}</b> • Unique names:{" "}
+                      <b>{uniqueNames.length}</b>
                     </div>
                     <div className="flex-1" />
                     <button
                       onClick={handleClassify}
                       className="px-3 py-2 rounded-lg bg-indigo-600 text-white hover:bg-indigo-700 disabled:opacity-50"
                       disabled={!uniqueNames.length || !apiKey}
-                      title={!apiKey ? "Add your API key in Settings" : "Classify with LLM"}
+                      title={
+                        !apiKey
+                          ? "Add your API key in Settings"
+                          : "Classify with LLM"
+                      }
                     >
                       Classify with LLM
+                    </button>
+                    <button
+                      onClick={() => {
+                        setEdits((prev) => {
+                          const merged = { ...prev };
+                          for (const [id, changes] of Object.entries(
+                            draftEdits
+                          )) {
+                            merged[id] = {
+                              ...(merged[id] || {}),
+                              ...(changes || {}),
+                            };
+                          }
+                          return merged;
+                        });
+                        setDraftEdits({});
+                        setStatus("Saved changes.");
+                      }}
+                      className="px-3 py-2 rounded-lg border bg-white hover:bg-gray-50"
+                    >
+                      Save changes
                     </button>
                     <button
                       onClick={handleDownload}
@@ -509,30 +822,168 @@ export default function App() {
                             "Notes",
                             "Source",
                           ].map((h) => (
-                            <th key={h} className="text-left font-semibold px-3 py-2 whitespace-nowrap">
+                            <th
+                              key={h}
+                              className="text-left font-semibold px-3 py-2 whitespace-nowrap"
+                            >
                               {h}
                             </th>
                           ))}
                         </tr>
                       </thead>
                       <tbody>
-                        {transformedFiltered.slice(0, 50).map((row, i) => (
-                          <tr key={i} className={i % 2 ? "bg-white" : "bg-gray-50"}>
-                            <td className="px-3 py-2 whitespace-nowrap">{row.Date}</td>
-                            <td className="px-3 py-2 whitespace-nowrap">{row.Type}</td>
-                            <td className="px-3 py-2 whitespace-nowrap">{row.Amount}</td>
-                            <td className="px-3 py-2 whitespace-nowrap">{row.Currency}</td>
-                            <td className="px-3 py-2 whitespace-nowrap">{row.Category}</td>
+                        {visibleRows.slice(0, 50).map((row: any, i: number) => (
+                          <tr
+                            key={i}
+                            className={i % 2 ? "bg-white" : "bg-gray-50"}
+                          >
+                            <td className="px-3 py-2 whitespace-nowrap">
+                              {editing?.id === row._id &&
+                              editing?.field === "Date" ? (
+                                <input
+                                  type="date"
+                                  className="border rounded px-2 py-1"
+                                  value={
+                                    (draftEdits[row._id]?.Date ??
+                                      edits[row._id]?.Date ??
+                                      row.Date) ||
+                                    ""
+                                  }
+                                  onChange={(e) =>
+                                    setDraftEdits((d) => ({
+                                      ...d,
+                                      [row._id]: {
+                                        ...(d[row._id] || {}),
+                                        Date: e.target.value,
+                                      },
+                                    }))
+                                  }
+                                  onBlur={() => setEditing(null)}
+                                  autoFocus
+                                />
+                              ) : (
+                                <button
+                                  className="text-left w-full"
+                                  onClick={() =>
+                                    setEditing({ id: row._id, field: "Date" })
+                                  }
+                                >
+                                  {row.Date || (
+                                    <span className="text-gray-400">—</span>
+                                  )}
+                                </button>
+                              )}
+                            </td>
+                            <td className="px-3 py-2 whitespace-nowrap">
+                              {row.Type}
+                            </td>
+                            <td className="px-3 py-2 whitespace-nowrap">
+                              {row.Amount}
+                            </td>
+                            <td className="px-3 py-2 whitespace-nowrap">
+                              {row.Currency}
+                            </td>
+                            <td className="px-3 py-2 whitespace-nowrap">
+                              {editing?.id === row._id &&
+                              editing?.field === "Category" ? (
+                                <select
+                                  className="border rounded px-2 py-1"
+                                  value={
+                                    (draftEdits[row._id]?.Category ??
+                                      edits[row._id]?.Category ??
+                                      row.Category) ||
+                                    ""
+                                  }
+                                  onChange={(e) =>
+                                    setDraftEdits((d) => ({
+                                      ...d,
+                                      [row._id]: {
+                                        ...(d[row._id] || {}),
+                                        Category: e.target.value,
+                                      },
+                                    }))
+                                  }
+                                  onBlur={() => setEditing(null)}
+                                  autoFocus
+                                >
+                                  {categorySet.map((c) => (
+                                    <option key={c} value={c}>
+                                      {c}
+                                    </option>
+                                  ))}
+                                </select>
+                              ) : (
+                                <button
+                                  className="text-left w-full"
+                                  onClick={() =>
+                                    setEditing({
+                                      id: row._id,
+                                      field: "Category",
+                                    })
+                                  }
+                                >
+                                  {row.Category || (
+                                    <span className="text-gray-400">—</span>
+                                  )}
+                                </button>
+                              )}
+                            </td>
                             <td className="px-3 py-2">{row.Name}</td>
-                            <td className="px-3 py-2 whitespace-nowrap">{row.Account}</td>
-                            <td className="px-3 py-2 whitespace-nowrap">{row.Notes}</td>
-                            <td className="px-3 py-2 whitespace-nowrap">{row.Source}</td>
+                            <td className="px-3 py-2 whitespace-nowrap">
+                              {row.Account}
+                            </td>
+                            <td className="px-3 py-2 whitespace-nowrap">
+                              {editing?.id === row._id &&
+                              editing?.field === "Notes" ? (
+                                <input
+                                  type="text"
+                                  className="border rounded px-2 py-1 w-48"
+                                  value={
+                                    (draftEdits[row._id]?.Notes ??
+                                      edits[row._id]?.Notes ??
+                                      row.Notes) ||
+                                    ""
+                                  }
+                                  onChange={(e) =>
+                                    setDraftEdits((d) => ({
+                                      ...d,
+                                      [row._id]: {
+                                        ...(d[row._id] || {}),
+                                        Notes: e.target.value,
+                                      },
+                                    }))
+                                  }
+                                  onBlur={() => setEditing(null)}
+                                  autoFocus
+                                />
+                              ) : (
+                                <button
+                                  className="text-left w-full"
+                                  onClick={() =>
+                                    setEditing({ id: row._id, field: "Notes" })
+                                  }
+                                >
+                                  {row.Notes ? (
+                                    row.Notes
+                                  ) : (
+                                    <span className="text-gray-400">
+                                      Click to add
+                                    </span>
+                                  )}
+                                </button>
+                              )}
+                            </td>
+                            <td className="px-3 py-2 whitespace-nowrap">
+                              {row.Source}
+                            </td>
                           </tr>
                         ))}
                       </tbody>
                     </table>
                   </div>
-                  <p className="text-xs text-gray-500">Showing first 50 rows. Download to get the full file.</p>
+                  <p className="text-xs text-gray-500">
+                    Showing first 50 rows. Download to get the full file.
+                  </p>
                 </div>
               )}
             </div>
@@ -540,14 +991,27 @@ export default function App() {
             <div className="bg-white rounded-2xl shadow p-5">
               <h3 className="font-semibold mb-2">How it works</h3>
               <ol className="list-decimal ml-5 text-sm text-gray-700 space-y-1">
-                <li>Go to <b>Settings</b> → paste your OpenAI API key (optional but recommended).</li>
-                <li>Back to <b>Transform</b> → upload the Revolut <code>.csv</code> export.</li>
-                <li>Click <b>Classify with LLM</b> to assign categories by transaction name. If no key, a simple heuristic is used.</li>
-                <li>Click <b>Download CSV</b> to save the normalized file with the required columns.</li>
+                <li>
+                  Go to <b>Settings</b> → paste your OpenAI API key (optional
+                  but recommended).
+                </li>
+                <li>
+                  Back to <b>Transform</b> → upload the Revolut{" "}
+                  <code>.csv</code> export.
+                </li>
+                <li>
+                  Click <b>Classify with LLM</b> to assign categories by
+                  transaction name. If no key, a simple heuristic is used.
+                </li>
+                <li>
+                  Click <b>Download CSV</b> to save the normalized file with the
+                  required columns.
+                </li>
               </ol>
               <p className="text-xs text-gray-500 mt-2">
-                Security note: this demo sends merchant names to OpenAI directly from your browser when you click classify.
-                For production, route via your own backend and never expose secrets client-side.
+                Security note: this demo sends merchant names to OpenAI directly
+                from your browser when you click classify. For production, route
+                via your own backend and never expose secrets client-side.
               </p>
             </div>
           </section>
@@ -555,7 +1019,8 @@ export default function App() {
       </main>
 
       <footer className="max-w-6xl mx-auto px-4 pb-10 text-xs text-gray-500">
-        Built for Revolut exports • Amounts are normalized as positive numbers, with <i>Type</i> carrying the sign.
+        Built for Revolut exports • Amounts are normalized as positive numbers,
+        with <i>Type</i> carrying the sign.
       </footer>
     </div>
   );
