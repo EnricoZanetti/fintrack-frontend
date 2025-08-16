@@ -15,20 +15,24 @@ let PapaRef: any = null;
 // ---- Small helpers ----
 const siteNameDefault = "Revolut CSV Transformer";
 const categorySet = [
-  "Groceries",
-  "Restaurants",
-  "Transport",
-  "Shopping",
-  "Entertainment",
-  "Bills",
   "Housing",
+  "Rent",
+  "Bills",
   "Health",
+  "Groceries",
+  "Transport",
+  "Fuel",
+  "Education",
+  "Out",
   "Travel",
-  "Cash Withdrawal",
+  "Shopping",
+  "Subscriptions",
+  "Leisure",
+  "Gifts",
+  "OtherExpenses",
   "Transfers",
   "Income",
   "Fees",
-  "Other",
 ];
 
 function classNames(...xs: Array<string | false | null | undefined>) {
@@ -62,7 +66,7 @@ function heuristicCategory(name: string): string {
   if (has("amazon") || has("zalando") || has("decathlon") || has("ikea")) return "Shopping";
   if (has("conad") || has("coop") || has("lidl") || has("eurospin") || has("supermerc")) return "Groceries";
   if (has("bar ") || has("caffe") || has("ristor") || has("trattoria") || has("locanda") || has("osteria") || has("pizza") || has("mcd") || has("burger") || has("kebab"))
-    return "Restaurants";
+    return "Out";
   if (has("trenitalia") || has("italo") || has("uber") || has("taxi") || has("flixbus") || has("ryanair") || has("wizz"))
     return "Transport";
   if (has("spotify") || has("netflix") || has("steam") || has("prime") || has("disney")) return "Entertainment";
@@ -71,7 +75,7 @@ function heuristicCategory(name: string): string {
   if (has("farmacia") || has("pharma") || has("clinic") || has("ospedale") || has("dental")) return "Health";
   if (has("hotel") || has("booking") || has("airbnb") || has("hostel")) return "Travel";
   if (has("fee") || has("commission")) return "Fees";
-  return "Other";
+  return "OtherExpenses";
 }
 
 async function classifyWithOpenAI(
