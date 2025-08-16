@@ -360,6 +360,19 @@ export default function App() {
     Record<string, Partial<Record<EditableField, string>>>
   >({});
 
+  // helper: commit draft edits for a row (merges into saved edits)
+  const commitEditsFor = (id: string) => {
+    setEdits((prev) => ({
+      ...prev,
+      [id]: { ...(prev[id] || {}), ...(draftEdits[id] || {}) },
+    }));
+    setDraftEdits((prev) => {
+      const { [id]: _drop, ...rest } = prev;
+      return rest;
+    });
+    setEditing(null);
+  };
+
   useEffect(() => {
     const s = localStorage.getItem("rcvt_settings");
     if (s) {
@@ -496,11 +509,24 @@ export default function App() {
       const amountAbs = Math.abs(amtNum || 0).toFixed(2);
       const name = (r["Description"] || "").toString();
       const category = categoryMap[name] || heuristicCategory(name);
+      const _id =
+        [
+          r["Started Date"],
+          r["Completed Date"],
+          r["Description"],
+          r["Amount"],
+          r["Currency"],
+          r["State"],
+          r["Balance"],
+        ]
+          .map((x) => (x ?? "").toString())
+          .join("|") + `|${i}`; // i suffix ensures uniqueness among true duplicates
+
       const dateVal = toISODate(
         r[dateField] || r["Completed Date"] || r["Started Date"] || ""
       );
       return {
-        _id: String(i),
+        _id,
         Date: dateVal,
         Type: type,
         Amount: amountAbs,
@@ -525,6 +551,18 @@ export default function App() {
       return { ...row, ...e };
     });
   }, [transformedFiltered, edits]);
+
+  const sortedRows = useMemo(() => {
+    // sort ascending by ISO Date (fallback to "" so undefined dates go last)
+    return [...visibleRows].sort((a: any, b: any) => {
+      const da = a.Date || "";
+      const db = b.Date || "";
+      if (da < db) return -1;
+      if (da > db) return 1;
+      // tie-breaker to keep order stable
+      return (a._id || "").localeCompare(b._id || "");
+    });
+  }, [visibleRows]);
 
   async function handleClassify() {
     try {
@@ -551,7 +589,7 @@ export default function App() {
       "Notes",
       "Source",
     ];
-    const body = visibleRows
+    const body = sortedRows
       .map((row) => cols.map((c) => csvEscape((row as any)[c])).join(","))
       .join("\n");
 
@@ -616,7 +654,7 @@ export default function App() {
               <h2 className="text-base font-semibold mb-3">General</h2>
               <div className="grid md:grid-cols-2 gap-4">
                 <label className="grid gap-1 text-sm">
-                  <span className="text-gray-600">Website name</span>
+                  <span className="text-gray-600">Source name</span>
                   <input
                     className="border rounded-lg px-3 py-2"
                     value={websiteName}
@@ -762,7 +800,7 @@ export default function App() {
                     <div className="text-sm text-gray-600">
                       Rows loaded: <b>{rawRows.length}</b> • After filter:{" "}
                       <b>{filteredRows.length}</b> • Export rows:{" "}
-                      <b>{visibleRows.length}</b> • Unique names:{" "}
+                      <b>{sortedRows.length}</b> • Unique names:{" "}
                       <b>{uniqueNames.length}</b>
                     </div>
                     <div className="flex-1" />
@@ -777,27 +815,6 @@ export default function App() {
                       }
                     >
                       Classify with LLM
-                    </button>
-                    <button
-                      onClick={() => {
-                        setEdits((prev) => {
-                          const merged = { ...prev };
-                          for (const [id, changes] of Object.entries(
-                            draftEdits
-                          )) {
-                            merged[id] = {
-                              ...(merged[id] || {}),
-                              ...(changes || {}),
-                            };
-                          }
-                          return merged;
-                        });
-                        setDraftEdits({});
-                        setStatus("Saved changes.");
-                      }}
-                      className="px-3 py-2 rounded-lg border bg-white hover:bg-gray-50"
-                    >
-                      Save changes
                     </button>
                     <button
                       onClick={handleDownload}
@@ -832,7 +849,7 @@ export default function App() {
                         </tr>
                       </thead>
                       <tbody>
-                        {visibleRows.slice(0, 50).map((row: any, i: number) => (
+                        {sortedRows.slice(0, 50).map((row: any, i: number) => (
                           <tr
                             key={i}
                             className={i % 2 ? "bg-white" : "bg-gray-50"}
@@ -858,7 +875,20 @@ export default function App() {
                                       },
                                     }))
                                   }
-                                  onBlur={() => setEditing(null)}
+                                  onKeyDown={(e) => {
+                                    if (e.key === "Enter")
+                                      commitEditsFor(row._id);
+                                    if (e.key === "Escape") {
+                                      setDraftEdits((d) => ({
+                                        ...d,
+                                        [row._id]: {
+                                          ...(edits[row._id] || {}),
+                                        },
+                                      }));
+                                      setEditing(null);
+                                    }
+                                  }}
+                                  onBlur={() => commitEditsFor(row._id)}
                                   autoFocus
                                 />
                               ) : (
@@ -886,32 +916,54 @@ export default function App() {
                             <td className="px-3 py-2 whitespace-nowrap">
                               {editing?.id === row._id &&
                               editing?.field === "Category" ? (
-                                <select
-                                  className="border rounded px-2 py-1"
-                                  value={
+                                (() => {
+                                  const current =
                                     (draftEdits[row._id]?.Category ??
                                       edits[row._id]?.Category ??
                                       row.Category) ||
-                                    ""
-                                  }
-                                  onChange={(e) =>
-                                    setDraftEdits((d) => ({
-                                      ...d,
-                                      [row._id]: {
-                                        ...(d[row._id] || {}),
-                                        Category: e.target.value,
-                                      },
-                                    }))
-                                  }
-                                  onBlur={() => setEditing(null)}
-                                  autoFocus
-                                >
-                                  {categorySet.map((c) => (
-                                    <option key={c} value={c}>
-                                      {c}
-                                    </option>
-                                  ))}
-                                </select>
+                                    "";
+                                  const safeValue = categorySet.includes(
+                                    current
+                                  )
+                                    ? current
+                                    : "OtherExpenses";
+                                  return (
+                                    <select
+                                      className="border rounded px-2 py-1"
+                                      value={safeValue}
+                                      onChange={(e) =>
+                                        setDraftEdits((d) => ({
+                                          ...d,
+                                          [row._id]: {
+                                            ...(d[row._id] || {}),
+                                            Category: e.target.value,
+                                          },
+                                        }))
+                                      }
+                                      onKeyDown={(e) => {
+                                        if (e.key === "Enter")
+                                          commitEditsFor(row._id);
+                                        if (e.key === "Escape") {
+                                          setDraftEdits((d) => ({
+                                            ...d,
+                                            [row._id]: {
+                                              ...(edits[row._id] || {}),
+                                            },
+                                          }));
+                                          setEditing(null);
+                                        }
+                                      }}
+                                      onBlur={() => commitEditsFor(row._id)}
+                                      autoFocus
+                                    >
+                                      {categorySet.map((c) => (
+                                        <option key={c} value={c}>
+                                          {c}
+                                        </option>
+                                      ))}
+                                    </select>
+                                  );
+                                })()
                               ) : (
                                 <button
                                   className="text-left w-full"
@@ -953,7 +1005,20 @@ export default function App() {
                                       },
                                     }))
                                   }
-                                  onBlur={() => setEditing(null)}
+                                  onKeyDown={(e) => {
+                                    if (e.key === "Enter")
+                                      commitEditsFor(row._id);
+                                    if (e.key === "Escape") {
+                                      setDraftEdits((d) => ({
+                                        ...d,
+                                        [row._id]: {
+                                          ...(edits[row._id] || {}),
+                                        },
+                                      }));
+                                      setEditing(null);
+                                    }
+                                  }}
+                                  onBlur={() => commitEditsFor(row._id)}
                                   autoFocus
                                 />
                               ) : (
