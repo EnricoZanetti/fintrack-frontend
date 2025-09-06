@@ -87,7 +87,8 @@ function heuristicCategory(name: string): string {
     has("coop") ||
     has("lidl") ||
     has("eurospin") ||
-    has("supermerc")
+    has("supermerc") ||
+    has("poli")
   )
     return "Groceries";
   if (
@@ -101,6 +102,11 @@ function heuristicCategory(name: string): string {
     has(" ip ")
   )
     return "Fuel";
+  if (
+    has("giunti") ||
+    has("libr")
+  )
+    return "Education";
   if (
     has("eni") ||
     has("esso") ||
@@ -141,7 +147,8 @@ function heuristicCategory(name: string): string {
     has("steam") ||
     has("prime") ||
     has("disney") ||
-    has("openai")
+    has("openai") ||
+    has("google")
   )
     return "Subscriptions";
   if (
@@ -160,7 +167,9 @@ function heuristicCategory(name: string): string {
     has("pharma") ||
     has("clinic") ||
     has("ospedale") ||
-    has("dental")
+    has("dental") ||
+    has("servizi sanitari") ||
+    has("barber")
   )
     return "Health";
   if (has("hotel") || has("booking") || has("airbnb") || has("hostel"))
