@@ -68,9 +68,22 @@ function heuristicCategory(name: string): string {
     has("salary") ||
     has("stipend") ||
     has("payroll") ||
-    has("bonifico in entrata")
+    has("bonifico in entrata") ||
+    has("payment from")
   )
     return "Income";
+  if (
+    has("farmacia") ||
+    has("farm") ||
+    has("pharma") ||
+    has("clinic") ||
+    has("ospedale") ||
+    has("dental") ||
+    has("servizi sanitari") ||
+    has("barber") ||
+    has("poliambulatori")
+  )
+    return "Health";
   if (has("atm") || has("cash withdrawal") || has("prelievo"))
     return "OtherExpenses";
   if (
@@ -125,10 +138,12 @@ function heuristicCategory(name: string): string {
     has("trattoria") ||
     has("locanda") ||
     has("osteria") ||
-    has("pizza") ||
+    has("pizz") ||
+    has("sushi") ||
     has("mcd") ||
     has("burger") ||
-    has("kebab")
+    has("kebab") ||
+    has("Urban Factory Lab")
   )
     return "Out";
   if (
@@ -162,16 +177,7 @@ function heuristicCategory(name: string): string {
     return "Bills";
   if (has("affitto") || has("rent") || has("mutuo") || has("mortgage"))
     return "Housing";
-  if (
-    has("farmacia") ||
-    has("pharma") ||
-    has("clinic") ||
-    has("ospedale") ||
-    has("dental") ||
-    has("servizi sanitari") ||
-    has("barber")
-  )
-    return "Health";
+
   if (has("hotel") || has("booking") || has("airbnb") || has("hostel"))
     return "Travel";
   if (has("fee") || has("commission")) return "Fees";
