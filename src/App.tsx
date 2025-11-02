@@ -143,7 +143,8 @@ function heuristicCategory(name: string): string {
     has("mcd") ||
     has("burger") ||
     has("kebab") ||
-    has("Urban Factory Lab")
+    has("Urban Factory Lab") ||
+    has("pasticceria")
   )
     return "Out";
   if (
