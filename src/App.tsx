@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 
 // --- Optional: PapaParse for robust CSV parsing ---
 // Canvas runtime makes NPM packages available; if it fails, we fall back to a tiny parser.
