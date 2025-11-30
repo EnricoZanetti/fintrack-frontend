@@ -1161,11 +1161,6 @@ export default function App() {
                   required columns.
                 </li>
               </ol>
-              <p className="text-xs text-gray-500 mt-2">
-                Security note: this demo sends merchant names to OpenAI directly
-                from your browser when you click classify. For production, route
-                via your own backend and never expose secrets client-side.
-              </p>
             </div>
           </section>
         )}
