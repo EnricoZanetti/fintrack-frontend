@@ -1,0 +1,28 @@
+[tool.ruff]
+line-length = 100
+target-version = "py312"
+
+[tool.ruff.lint]
+# Base rule sets + docstrings (D)
+select = [
+  "E",   # pycodestyle errors
+  "F",   # pyflakes
+  "I",   # isort (imports)
+  "B",   # flake8-bugbear
+  "UP",  # pyupgrade
+  "W",   # pycodestyle warnings
+  "SIM", # flake8-simplify
+  "D"    # pydocstyle (docstrings)
+]
+# or: extend-select = ["D"]  # (alternative to adding "D" above)
+ignore = ["D100", "D105", "D106"]
+
+[tool.ruff.lint.isort]
+# If your apps live under `apps/`, mark them first-party
+known-first-party = ["apps"]
+
+[tool.ruff.lint.pydocstyle]
+convention = "numpy"  # or "google" / "pep257"
+
+[tool.ruff.format]
+# Uses line-length above; few other knobs are needed
