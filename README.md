@@ -1,4 +1,4 @@
-# FinTrack Frontend — Revolut CSV Transformer (v0.1)
+# FinTrack - Revolut CSV Transformer (v0.1)
 
 A lightweight web app to upload a Revolut CSV export, normalize its data, (optionally) classify categories with an LLM, **edit fields inline**, and download a clean CSV ready for analysis.
 
@@ -145,22 +145,6 @@ All settings (and your API key) are stored in **localStorage**:
 - `websiteName`, `source`, `dateField`, `onlyCompleted`, `model`, `typeFilter`, `apiKey`.
 
 > Prototype intent: For production, move secrets off the client.
-
----
-
-## Project Structure
-
-```
-fintrack-frontend/
-├── public/
-├── src/
-│   ├── App.tsx          # main app (UI + logic)
-│   ├── main.tsx         # React entry
-│   └── index.css        # Tailwind v4: @import "tailwindcss";
-├── vite.config.ts       # includes @tailwindcss/vite plugin
-├── package.json
-└── README.md
-```
 
 ---
 
