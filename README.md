@@ -10,6 +10,12 @@ A lightweight web app to upload a Revolut CSV export, normalize its data, (optio
 
 ---
 
+<p align="center">
+  <img src="public/img/ft-favicon.png" alt="FinTrack Logo" width="500"/>
+</p>
+
+---
+
 ## Features
 
 - Upload & parse **Revolut** CSV (supports EU and US numeric formats).
