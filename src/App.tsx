@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from "react";
+import ftLogo from "./assets/ft-favicon.png";
 
 // Canvas runtime makes NPM packages available; if it fails, we fall back to a tiny parser.
 let PapaRef: any = null;
@@ -643,7 +644,7 @@ export default function App() {
           <div className="flex items-center gap-3">
             <div className="h-9 w-9 rounded-2xl bg-indigo-600 flex items-center justify-center">
               <img
-                src="/img/ft-favicon.svg"
+                src={ftLogo}
                 alt="FinTrack logo"
                 className="h-6 w-6"
               />
