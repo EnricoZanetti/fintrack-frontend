@@ -1,6 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 
-// --- Optional: PapaParse for robust CSV parsing ---
 // Canvas runtime makes NPM packages available; if it fails, we fall back to a tiny parser.
 let PapaRef: any = null;
 (async () => {
@@ -363,7 +362,7 @@ export default function App() {
   );
 
   // Add types + state
-  type EditableField = "Date" | "Category" | "Notes";
+  type EditableField = "Date" | "Category" | "Notes" | "Amount";
 
   const [editing, setEditing] = useState<{
     id: string;
@@ -376,6 +375,9 @@ export default function App() {
     Record<string, Partial<Record<EditableField, string>>>
   >({});
 
+  // deleted rows (by _id)
+  const [deletedIds, setDeletedIds] = useState<Set<string>>(new Set());
+
   // helper: commit draft edits for a row (merges into saved edits)
   const commitEditsFor = (id: string) => {
     setEdits((prev) => ({
@@ -387,6 +389,14 @@ export default function App() {
       return rest;
     });
     setEditing(null);
+  };
+
+  const handleDeleteRow = (id: string) => {
+    setDeletedIds((prev) => {
+      const next = new Set(prev);
+      next.add(id);
+      return next;
+    });
   };
 
   useEffect(() => {
@@ -454,6 +464,7 @@ export default function App() {
     setCategoryMap({});
     setEdits({});
     setDraftEdits({});
+    setDeletedIds(new Set());
 
     const text = await file.text();
     let data: any[] = [];
@@ -562,11 +573,13 @@ export default function App() {
   }, [transformedAll, typeFilter]);
 
   const visibleRows = useMemo(() => {
-    return transformedFiltered.map((row: any) => {
-      const e = edits[row._id] || {};
-      return { ...row, ...e };
-    });
-  }, [transformedFiltered, edits]);
+    return transformedFiltered
+      .filter((row) => !deletedIds.has(row._id))
+      .map((row: any) => {
+        const e = edits[row._id] || {};
+        return { ...row, ...e };
+      });
+  }, [transformedFiltered, edits, deletedIds]);
 
   const sortedRows = useMemo(() => {
     // sort ascending by ISO Date (fallback to "" so undefined dates go last)
@@ -780,6 +793,9 @@ export default function App() {
                       setRawRows([]);
                       setErrors([]);
                       setCategoryMap({});
+                      setEdits({});
+                      setDraftEdits({});
+                      setDeletedIds(new Set());
                       if (fileRef.current) fileRef.current.value = "";
                     }}
                     className="px-3 py-2 rounded-lg border bg-white hover:bg-gray-50"
@@ -848,6 +864,7 @@ export default function App() {
                     <table className="min-w-full text-sm">
                       <thead className="bg-gray-100 sticky top-0">
                         <tr>
+                          <th className="px-3 py-2" />
                           {[
                             "Date",
                             "Type",
@@ -869,11 +886,20 @@ export default function App() {
                         </tr>
                       </thead>
                       <tbody>
-                        {sortedRows.slice(0, 50).map((row: any, i: number) => (
+                        {sortedRows.map((row: any, i: number) => (
                           <tr
-                            key={i}
+                            key={row._id}
                             className={i % 2 ? "bg-white" : "bg-gray-50"}
                           >
+                            <td className="px-3 py-2 whitespace-nowrap">
+                              <button
+                                onClick={() => handleDeleteRow(row._id)}
+                                className="text-red-500 hover:text-red-700 text-xs"
+                                title="Remove row"
+                              >
+                                ✕
+                              </button>
+                            </td>
                             <td className="px-3 py-2 whitespace-nowrap">
                               {editing?.id === row._id &&
                               editing?.field === "Date" ? (
@@ -928,7 +954,52 @@ export default function App() {
                               {row.Type}
                             </td>
                             <td className="px-3 py-2 whitespace-nowrap">
-                              {row.Amount}
+                              {editing?.id === row._id &&
+                              editing?.field === "Amount" ? (
+                                <input
+                                  type="text"
+                                  className="border rounded px-2 py-1 w-24"
+                                  value={
+                                    (draftEdits[row._id]?.Amount ??
+                                      edits[row._id]?.Amount ??
+                                      row.Amount) ||
+                                    ""
+                                  }
+                                  onChange={(e) =>
+                                    setDraftEdits((d) => ({
+                                      ...d,
+                                      [row._id]: {
+                                        ...(d[row._id] || {}),
+                                        Amount: e.target.value,
+                                      },
+                                    }))
+                                  }
+                                  onKeyDown={(e) => {
+                                    if (e.key === "Enter")
+                                      commitEditsFor(row._id);
+                                    if (e.key === "Escape") {
+                                      setDraftEdits((d) => ({
+                                        ...d,
+                                        [row._id]: {
+                                          ...(edits[row._id] || {}),
+                                        },
+                                      }));
+                                      setEditing(null);
+                                    }
+                                  }}
+                                  onBlur={() => commitEditsFor(row._id)}
+                                  autoFocus
+                                />
+                              ) : (
+                                <button
+                                  className="text-left w-full"
+                                  onClick={() =>
+                                    setEditing({ id: row._id, field: "Amount" })
+                                  }
+                                >
+                                  {row.Amount}
+                                </button>
+                              )}
                             </td>
                             <td className="px-3 py-2 whitespace-nowrap">
                               {row.Currency}
@@ -1066,9 +1137,6 @@ export default function App() {
                       </tbody>
                     </table>
                   </div>
-                  <p className="text-xs text-gray-500">
-                    Showing first 50 rows. Download to get the full file.
-                  </p>
                 </div>
               )}
             </div>
