@@ -36,6 +36,32 @@ const categorySet = [
   "Fees",
 ];
 
+const categoryColorClasses: Record<string, string> = {
+  Groceries: "bg-emerald-100 text-emerald-800",
+  Transport: "bg-sky-100 text-sky-800",
+  Fuel: "bg-amber-100 text-amber-800",
+  Shopping: "bg-violet-100 text-violet-800",
+  Income: "bg-green-100 text-green-800",
+  Transfers: "bg-slate-100 text-slate-800",
+  Bills: "bg-orange-100 text-orange-800",
+  Health: "bg-rose-100 text-rose-800",
+  Subscriptions: "bg-indigo-100 text-indigo-800",
+  Leisure: "bg-fuchsia-100 text-fuchsia-800",
+  Travel: "bg-cyan-100 text-cyan-800",
+  Out: "bg-pink-100 text-pink-800",
+  Housing: "bg-yellow-100 text-yellow-800",
+  Rent: "bg-yellow-100 text-yellow-800",
+  Fees: "bg-red-100 text-red-800",
+  Gifts: "bg-lime-100 text-lime-800",
+  Education: "bg-teal-100 text-teal-800",
+  OtherExpenses: "bg-gray-100 text-gray-800",
+};
+
+function categoryBadgeClass(category: string): string {
+  return categoryColorClasses[category] || "bg-gray-100 text-gray-700";
+}
+
+
 function classNames(...xs: Array<string | false | null | undefined>) {
   return xs.filter(Boolean).join(" ");
 }
@@ -379,6 +405,11 @@ export default function App() {
   // deleted rows (by _id)
   const [deletedIds, setDeletedIds] = useState<Set<string>>(new Set());
 
+  // selection for bulk actions
+  const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
+  const [bulkCategory, setBulkCategory] = useState<string>(categorySet[0]);
+
+
   // helper: commit draft edits for a row (merges into saved edits)
   const commitEditsFor = (id: string) => {
     setEdits((prev) => ({
@@ -398,7 +429,35 @@ export default function App() {
       next.add(id);
       return next;
     });
+    setSelectedIds((prev) => {
+      if (!prev.has(id)) return prev;
+      const next = new Set(prev);
+      next.delete(id);
+      return next;
+    });
   };
+
+    const toggleSelectRow = (id: string) => {
+    setSelectedIds((prev) => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      return next;
+    });
+  };
+
+  const handleBulkApplyCategory = () => {
+    if (!selectedIds.size) return;
+    setEdits((prev) => {
+      const next = { ...prev };
+      selectedIds.forEach((id) => {
+        const existing = next[id] || {};
+        next[id] = { ...existing, Category: bulkCategory };
+      });
+      return next;
+    });
+  };
+
 
   useEffect(() => {
     const s = localStorage.getItem("rcvt_settings");
@@ -466,6 +525,7 @@ export default function App() {
     setEdits({});
     setDraftEdits({});
     setDeletedIds(new Set());
+    setSelectedIds(new Set());
 
     const text = await file.text();
     let data: any[] = [];
@@ -642,13 +702,11 @@ export default function App() {
       <header className="sticky top-0 z-20 bg-white/90 backdrop-blur border-b">
         <div className="max-w-6xl mx-auto px-4 py-3 flex items-center justify-between">
           <div className="flex items-center gap-3">
-            <div className="h-9 w-9 rounded-2xl bg-indigo-600 flex items-center justify-center">
-              <img
-                src={ftLogo}
-                alt="FinTrack logo"
-                className="h-6 w-6"
-              />
-            </div>
+            <img
+              src={ftLogo}
+              alt="FinTrack logo"
+              className="h-10 w-10"
+            />
             <div>
               <h1 className="text-lg font-semibold">
                 {websiteName || siteNameDefault}
@@ -797,6 +855,7 @@ export default function App() {
                       setEdits({});
                       setDraftEdits({});
                       setDeletedIds(new Set());
+                      setSelectedIds(new Set());
                       if (fileRef.current) fileRef.current.value = "";
                     }}
                     className="px-3 py-2 rounded-lg border bg-white hover:bg-gray-50"
@@ -834,21 +893,47 @@ export default function App() {
                         <option value="Income">Income only</option>
                       </select>
                     </label>
+
                     <div className="text-sm text-gray-600">
                       Rows loaded: <b>{rawRows.length}</b> • After filter:{" "}
                       <b>{filteredRows.length}</b> • Export rows:{" "}
                       <b>{sortedRows.length}</b> • Unique names:{" "}
                       <b>{uniqueNames.length}</b>
                     </div>
+
+                    {/* bulk category for selected */}
+                    <div className="flex items-center gap-2 text-sm">
+                      <span className="text-gray-600">
+                        Selected: <b>{selectedIds.size}</b>
+                      </span>
+                      <select
+                        className="border rounded-lg px-2 py-1"
+                        value={bulkCategory}
+                        onChange={(e) => setBulkCategory(e.target.value)}
+                      >
+                        {categorySet.map((c) => (
+                          <option key={c} value={c}>
+                            {c}
+                          </option>
+                        ))}
+                      </select>
+                      <button
+                        onClick={handleBulkApplyCategory}
+                        disabled={!selectedIds.size}
+                        className="px-2 py-1 rounded-lg text-xs bg-gray-900 text-white disabled:opacity-40"
+                      >
+                        Apply to selected
+                      </button>
+                    </div>
+
                     <div className="flex-1" />
+
                     <button
                       onClick={handleClassify}
                       className="px-3 py-2 rounded-lg bg-indigo-600 text-white hover:bg-indigo-700 disabled:opacity-50"
                       disabled={!uniqueNames.length || !apiKey}
                       title={
-                        !apiKey
-                          ? "Add your API key in Settings"
-                          : "Classify with LLM"
+                        !apiKey ? "Add your API key in Settings" : "Classify with LLM"
                       }
                     >
                       Classify with LLM
@@ -865,6 +950,31 @@ export default function App() {
                     <table className="min-w-full text-sm">
                       <thead className="bg-gray-100 sticky top-0">
                         <tr>
+                          {/* select all checkbox */}
+                          <th className="px-3 py-2">
+                            <input
+                              type="checkbox"
+                              className="h-4 w-4"
+                              checked={
+                                sortedRows.length > 0 &&
+                                sortedRows.every((row: any) => selectedIds.has(row._id))
+                              }
+                              onChange={() => {
+                                const allSelected =
+                                  sortedRows.length > 0 &&
+                                  sortedRows.every((row: any) => selectedIds.has(row._id));
+                                if (allSelected) {
+                                  setSelectedIds(new Set());
+                                } else {
+                                  const next = new Set<string>();
+                                  sortedRows.forEach((row: any) => next.add(row._id));
+                                  setSelectedIds(next);
+                                }
+                              }}
+                              aria-label="Select all visible rows"
+                            />
+                          </th>
+                          {/* delete column header (blank) */}
                           <th className="px-3 py-2" />
                           {[
                             "Date",
@@ -887,254 +997,279 @@ export default function App() {
                         </tr>
                       </thead>
                       <tbody>
-                        {sortedRows.map((row: any, i: number) => (
-                          <tr
-                            key={row._id}
-                            className={i % 2 ? "bg-white" : "bg-gray-50"}
-                          >
-                            <td className="px-3 py-2 whitespace-nowrap">
-                              <button
-                                onClick={() => handleDeleteRow(row._id)}
-                                className="text-red-500 hover:text-red-700 text-xs"
-                                title="Remove row"
-                              >
-                                ✕
-                              </button>
-                            </td>
-                            <td className="px-3 py-2 whitespace-nowrap">
-                              {editing?.id === row._id &&
-                              editing?.field === "Date" ? (
+                        {sortedRows.map((row: any, i: number) => {
+                          const isSelected = selectedIds.has(row._id);
+                          const baseColor =
+                            row.Type === "Expense"
+                              ? "bg-red-50"
+                              : row.Type === "Income"
+                              ? "bg-green-50"
+                              : i % 2
+                              ? "bg-white"
+                              : "bg-gray-50";
+
+                          return (
+                            <tr
+                              key={row._id}
+                              className={classNames(
+                                baseColor,
+                                isSelected && "ring-2 ring-indigo-300"
+                              )}
+                            >
+                              {/* selection checkbox */}
+                              <td className="px-3 py-2 whitespace-nowrap">
                                 <input
-                                  type="date"
-                                  className="border rounded px-2 py-1"
-                                  value={
-                                    (draftEdits[row._id]?.Date ??
-                                      edits[row._id]?.Date ??
-                                      row.Date) ||
-                                    ""
-                                  }
-                                  onChange={(e) =>
-                                    setDraftEdits((d) => ({
-                                      ...d,
-                                      [row._id]: {
-                                        ...(d[row._id] || {}),
-                                        Date: e.target.value,
-                                      },
-                                    }))
-                                  }
-                                  onKeyDown={(e) => {
-                                    if (e.key === "Enter")
-                                      commitEditsFor(row._id);
-                                    if (e.key === "Escape") {
+                                  type="checkbox"
+                                  className="h-4 w-4"
+                                  checked={isSelected}
+                                  onChange={() => toggleSelectRow(row._id)}
+                                />
+                              </td>
+
+                              {/* delete button */}
+                              <td className="px-3 py-2 whitespace-nowrap">
+                                <button
+                                  onClick={() => handleDeleteRow(row._id)}
+                                  className="text-red-500 hover:text-red-700 text-xs"
+                                  title="Remove row"
+                                >
+                                  ✕
+                                </button>
+                              </td>
+
+                              {/* Date */}
+                              <td className="px-3 py-2 whitespace-nowrap">
+                                {editing?.id === row._id && editing?.field === "Date" ? (
+                                  <input
+                                    type="date"
+                                    className="border rounded px-2 py-1"
+                                    value={
+                                      (draftEdits[row._id]?.Date ??
+                                        edits[row._id]?.Date ??
+                                        row.Date) || ""
+                                    }
+                                    onChange={(e) =>
                                       setDraftEdits((d) => ({
                                         ...d,
                                         [row._id]: {
-                                          ...(edits[row._id] || {}),
+                                          ...(d[row._id] || {}),
+                                          Date: e.target.value,
                                         },
-                                      }));
-                                      setEditing(null);
+                                      }))
                                     }
-                                  }}
-                                  onBlur={() => commitEditsFor(row._id)}
-                                  autoFocus
-                                />
-                              ) : (
-                                <button
-                                  className="text-left w-full"
-                                  onClick={() =>
-                                    setEditing({ id: row._id, field: "Date" })
-                                  }
-                                >
-                                  {row.Date || (
-                                    <span className="text-gray-400">—</span>
-                                  )}
-                                </button>
-                              )}
-                            </td>
-                            <td className="px-3 py-2 whitespace-nowrap">
-                              {row.Type}
-                            </td>
-                            <td className="px-3 py-2 whitespace-nowrap">
-                              {editing?.id === row._id &&
-                              editing?.field === "Amount" ? (
-                                <input
-                                  type="text"
-                                  className="border rounded px-2 py-1 w-24"
-                                  value={
-                                    (draftEdits[row._id]?.Amount ??
-                                      edits[row._id]?.Amount ??
-                                      row.Amount) ||
-                                    ""
-                                  }
-                                  onChange={(e) =>
-                                    setDraftEdits((d) => ({
-                                      ...d,
-                                      [row._id]: {
-                                        ...(d[row._id] || {}),
-                                        Amount: e.target.value,
-                                      },
-                                    }))
-                                  }
-                                  onKeyDown={(e) => {
-                                    if (e.key === "Enter")
-                                      commitEditsFor(row._id);
-                                    if (e.key === "Escape") {
-                                      setDraftEdits((d) => ({
-                                        ...d,
-                                        [row._id]: {
-                                          ...(edits[row._id] || {}),
-                                        },
-                                      }));
-                                      setEditing(null);
-                                    }
-                                  }}
-                                  onBlur={() => commitEditsFor(row._id)}
-                                  autoFocus
-                                />
-                              ) : (
-                                <button
-                                  className="text-left w-full"
-                                  onClick={() =>
-                                    setEditing({ id: row._id, field: "Amount" })
-                                  }
-                                >
-                                  {row.Amount}
-                                </button>
-                              )}
-                            </td>
-                            <td className="px-3 py-2 whitespace-nowrap">
-                              {row.Currency}
-                            </td>
-                            <td className="px-3 py-2 whitespace-nowrap">
-                              {editing?.id === row._id &&
-                              editing?.field === "Category" ? (
-                                (() => {
-                                  const current =
-                                    (draftEdits[row._id]?.Category ??
-                                      edits[row._id]?.Category ??
-                                      row.Category) ||
-                                    "";
-                                  const safeValue = categorySet.includes(
-                                    current
-                                  )
-                                    ? current
-                                    : "OtherExpenses";
-                                  return (
-                                    <select
-                                      className="border rounded px-2 py-1"
-                                      value={safeValue}
-                                      onChange={(e) =>
+                                    onKeyDown={(e) => {
+                                      if (e.key === "Enter") commitEditsFor(row._id);
+                                      if (e.key === "Escape") {
                                         setDraftEdits((d) => ({
                                           ...d,
                                           [row._id]: {
-                                            ...(d[row._id] || {}),
-                                            Category: e.target.value,
+                                            ...(edits[row._id] || {}),
                                           },
-                                        }))
+                                        }));
+                                        setEditing(null);
                                       }
-                                      onKeyDown={(e) => {
-                                        if (e.key === "Enter")
-                                          commitEditsFor(row._id);
-                                        if (e.key === "Escape") {
-                                          setDraftEdits((d) => ({
-                                            ...d,
-                                            [row._id]: {
-                                              ...(edits[row._id] || {}),
-                                            },
-                                          }));
-                                          setEditing(null);
-                                        }
-                                      }}
-                                      onBlur={() => commitEditsFor(row._id)}
-                                      autoFocus
-                                    >
-                                      {categorySet.map((c) => (
-                                        <option key={c} value={c}>
-                                          {c}
-                                        </option>
-                                      ))}
-                                    </select>
-                                  );
-                                })()
-                              ) : (
-                                <button
-                                  className="text-left w-full"
-                                  onClick={() =>
-                                    setEditing({
-                                      id: row._id,
-                                      field: "Category",
-                                    })
-                                  }
-                                >
-                                  {row.Category || (
-                                    <span className="text-gray-400">—</span>
-                                  )}
-                                </button>
-                              )}
-                            </td>
-                            <td className="px-3 py-2">{row.Name}</td>
-                            <td className="px-3 py-2 whitespace-nowrap">
-                              {row.Account}
-                            </td>
-                            <td className="px-3 py-2 whitespace-nowrap">
-                              {editing?.id === row._id &&
-                              editing?.field === "Notes" ? (
-                                <input
-                                  type="text"
-                                  className="border rounded px-2 py-1 w-48"
-                                  value={
-                                    (draftEdits[row._id]?.Notes ??
-                                      edits[row._id]?.Notes ??
-                                      row.Notes) ||
-                                    ""
-                                  }
-                                  onChange={(e) =>
-                                    setDraftEdits((d) => ({
-                                      ...d,
-                                      [row._id]: {
-                                        ...(d[row._id] || {}),
-                                        Notes: e.target.value,
-                                      },
-                                    }))
-                                  }
-                                  onKeyDown={(e) => {
-                                    if (e.key === "Enter")
-                                      commitEditsFor(row._id);
-                                    if (e.key === "Escape") {
+                                    }}
+                                    onBlur={() => commitEditsFor(row._id)}
+                                    autoFocus
+                                  />
+                                ) : (
+                                  <button
+                                    className="text-left w-full"
+                                    onClick={() => setEditing({ id: row._id, field: "Date" })}
+                                  >
+                                    {row.Date || <span className="text-gray-400">—</span>}
+                                  </button>
+                                )}
+                              </td>
+
+                              {/* Type */}
+                              <td className="px-3 py-2 whitespace-nowrap">
+                                {row.Type}
+                              </td>
+
+                              {/* Amount */}
+                              <td className="px-3 py-2 whitespace-nowrap">
+                                {editing?.id === row._id && editing?.field === "Amount" ? (
+                                  <input
+                                    type="text"
+                                    className="border rounded px-2 py-1 w-24"
+                                    value={
+                                      (draftEdits[row._id]?.Amount ??
+                                        edits[row._id]?.Amount ??
+                                        row.Amount) || ""
+                                    }
+                                    onChange={(e) =>
                                       setDraftEdits((d) => ({
                                         ...d,
                                         [row._id]: {
-                                          ...(edits[row._id] || {}),
+                                          ...(d[row._id] || {}),
+                                          Amount: e.target.value,
                                         },
-                                      }));
-                                      setEditing(null);
+                                      }))
                                     }
-                                  }}
-                                  onBlur={() => commitEditsFor(row._id)}
-                                  autoFocus
-                                />
-                              ) : (
-                                <button
-                                  className="text-left w-full"
-                                  onClick={() =>
-                                    setEditing({ id: row._id, field: "Notes" })
-                                  }
-                                >
-                                  {row.Notes ? (
-                                    row.Notes
-                                  ) : (
-                                    <span className="text-gray-400">
-                                      Click to add
-                                    </span>
-                                  )}
-                                </button>
-                              )}
-                            </td>
-                            <td className="px-3 py-2 whitespace-nowrap">
-                              {row.Source}
-                            </td>
-                          </tr>
-                        ))}
+                                    onKeyDown={(e) => {
+                                      if (e.key === "Enter") commitEditsFor(row._id);
+                                      if (e.key === "Escape") {
+                                        setDraftEdits((d) => ({
+                                          ...d,
+                                          [row._id]: {
+                                            ...(edits[row._id] || {}),
+                                          },
+                                        }));
+                                        setEditing(null);
+                                      }
+                                    }}
+                                    onBlur={() => commitEditsFor(row._id)}
+                                    autoFocus
+                                  />
+                                ) : (
+                                  <button
+                                    className="text-left w-full"
+                                    onClick={() => setEditing({ id: row._id, field: "Amount" })}
+                                  >
+                                    {row.Amount}
+                                  </button>
+                                )}
+                              </td>
+
+                              {/* Currency */}
+                              <td className="px-3 py-2 whitespace-nowrap">
+                                {row.Currency}
+                              </td>
+
+                              {/* Category with colored badge */}
+                              <td className="px-3 py-2 whitespace-nowrap">
+                                {editing?.id === row._id && editing?.field === "Category" ? (
+                                  (() => {
+                                    const current =
+                                      (draftEdits[row._id]?.Category ??
+                                        edits[row._id]?.Category ??
+                                        row.Category) || "";
+                                    const safeValue = categorySet.includes(current)
+                                      ? current
+                                      : "OtherExpenses";
+                                    return (
+                                      <select
+                                        className="border rounded px-2 py-1"
+                                        value={safeValue}
+                                        onChange={(e) =>
+                                          setDraftEdits((d) => ({
+                                            ...d,
+                                            [row._id]: {
+                                              ...(d[row._id] || {}),
+                                              Category: e.target.value,
+                                            },
+                                          }))
+                                        }
+                                        onKeyDown={(e) => {
+                                          if (e.key === "Enter") commitEditsFor(row._id);
+                                          if (e.key === "Escape") {
+                                            setDraftEdits((d) => ({
+                                              ...d,
+                                              [row._id]: {
+                                                ...(edits[row._id] || {}),
+                                              },
+                                            }));
+                                            setEditing(null);
+                                          }
+                                        }}
+                                        onBlur={() => commitEditsFor(row._id)}
+                                        autoFocus
+                                      >
+                                        {categorySet.map((c) => (
+                                          <option key={c} value={c}>
+                                            {c}
+                                          </option>
+                                        ))}
+                                      </select>
+                                    );
+                                  })()
+                                ) : (
+                                  <button
+                                    className="text-left w-full"
+                                    onClick={() =>
+                                      setEditing({
+                                        id: row._id,
+                                        field: "Category",
+                                      })
+                                    }
+                                  >
+                                    {row.Category ? (
+                                      <span
+                                        className={classNames(
+                                          "inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium",
+                                          categoryBadgeClass(row.Category)
+                                        )}
+                                      >
+                                        {row.Category}
+                                      </span>
+                                    ) : (
+                                      <span className="text-gray-400">—</span>
+                                    )}
+                                  </button>
+                                )}
+                              </td>
+
+                              {/* Name */}
+                              <td className="px-3 py-2">{row.Name}</td>
+
+                              {/* Account */}
+                              <td className="px-3 py-2 whitespace-nowrap">{row.Account}</td>
+
+                              {/* Notes */}
+                              <td className="px-3 py-2 whitespace-nowrap">
+                                {editing?.id === row._id && editing?.field === "Notes" ? (
+                                  <input
+                                    type="text"
+                                    className="border rounded px-2 py-1 w-48"
+                                    value={
+                                      (draftEdits[row._id]?.Notes ??
+                                        edits[row._id]?.Notes ??
+                                        row.Notes) || ""
+                                    }
+                                    onChange={(e) =>
+                                      setDraftEdits((d) => ({
+                                        ...d,
+                                        [row._id]: {
+                                          ...(d[row._id] || {}),
+                                          Notes: e.target.value,
+                                        },
+                                      }))
+                                    }
+                                    onKeyDown={(e) => {
+                                      if (e.key === "Enter") commitEditsFor(row._id);
+                                      if (e.key === "Escape") {
+                                        setDraftEdits((d) => ({
+                                          ...d,
+                                          [row._id]: {
+                                            ...(edits[row._id] || {}),
+                                          },
+                                        }));
+                                        setEditing(null);
+                                      }
+                                    }}
+                                    onBlur={() => commitEditsFor(row._id)}
+                                    autoFocus
+                                  />
+                                ) : (
+                                  <button
+                                    className="text-left w-full"
+                                    onClick={() => setEditing({ id: row._id, field: "Notes" })}
+                                  >
+                                    {row.Notes ? (
+                                      row.Notes
+                                    ) : (
+                                      <span className="text-gray-400">Click to add</span>
+                                    )}
+                                  </button>
+                                )}
+                              </td>
+
+                              {/* Source */}
+                              <td className="px-3 py-2 whitespace-nowrap">{row.Source}</td>
+                            </tr>
+                          );
+                        })}
                       </tbody>
                     </table>
                   </div>
