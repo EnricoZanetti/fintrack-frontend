@@ -628,11 +628,13 @@ export default function App() {
       <header className="sticky top-0 z-20 bg-white/90 backdrop-blur border-b">
         <div className="max-w-6xl mx-auto px-4 py-3 flex items-center justify-between">
           <div className="flex items-center gap-3">
-            <img
-              src="/img/ft-favicon.svg"
-              alt="FinTrack logo"
-              className="h-9 w-9 rounded-2xl object-cover"
-            />
+            <div className="h-9 w-9 rounded-2xl bg-indigo-600 flex items-center justify-center">
+              <img
+                src="/img/ft-favicon.svg"
+                alt="FinTrack logo"
+                className="h-6 w-6"
+              />
+            </div>
             <div>
               <h1 className="text-lg font-semibold">
                 {websiteName || siteNameDefault}
