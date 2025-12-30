@@ -172,7 +172,9 @@ function heuristicCategory(name: string): string {
     has("burger") ||
     has("kebab") ||
     has("Urban Factory Lab") ||
-    has("pasticceria")
+    has("pasticceria") ||
+    has("Grupppo Negozi") ||
+    has("ramen")
   )
     return "Out";
   if (
@@ -182,7 +184,9 @@ function heuristicCategory(name: string): string {
     has("taxi") ||
     has("flixbus") ||
     has("ryanair") ||
-    has("wizz")
+    has("wizz") ||
+    has("autostrad") ||
+    has("funivia")
   )
     return "Transport";
   if (
@@ -204,7 +208,7 @@ function heuristicCategory(name: string): string {
     has("bolletta")
   )
     return "Bills";
-  if (has("affitto") || has("rent") || has("mutuo") || has("mortgage"))
+  if (has("affitto") || has("mutuo") || has("mortgage") || has("rispa"))
     return "Housing";
 
   if (has("hotel") || has("booking") || has("airbnb") || has("hostel"))
